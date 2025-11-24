@@ -30,6 +30,7 @@ import { ConfigDrawer } from '@/components/config-drawer'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { ExamSelector } from '@/components/exam-selector'
 import { examLabelMap, type ExamSelection, useCurrentExam } from '@/stores/exam-store'
+import { useAnalyticsOverviewQuery } from './api'
 
 type ActivityPoint = {
   date: string
@@ -58,38 +59,6 @@ const dateRangeOptions = ['Today', 'Last 7 days', 'Last 30 days'] as const
 
 type DateRange = (typeof dateRangeOptions)[number]
 
-const kpiCards = [
-  {
-    title: 'Total Users',
-    value: '12,340',
-    caption: '+5% vs last 7 days',
-  },
-  {
-    title: 'Active Users (DAU)',
-    value: '1,230',
-    caption: '58% of total users',
-  },
-  {
-    title: 'Questions Answered',
-    value: '18,540',
-    caption: 'Avg per user: 15',
-  },
-  {
-    title: 'Average Accuracy',
-    value: '62%',
-    caption: 'Last 7 days',
-  },
-  {
-    title: 'Avg Study Time',
-    value: '42 min',
-    caption: 'Per active user',
-  },
-  {
-    title: 'Total Rewards (₹)',
-    value: '₹32,400',
-    caption: 'Tokens, exams, referrals',
-  },
-]
 
 const subjectAccuracyMap: Record<ExamSelection, { subject: string; accuracy: number }[]> = {
   NEET_PG: [
@@ -268,6 +237,13 @@ export function Dashboard() {
   const { exam } = useCurrentExam()
   const [range, setRange] = useState<DateRange>('Last 7 days')
   const examLabel = examLabelMap[exam]
+  const rangeParam =
+    range === 'Today' ? 'today' : range === 'Last 7 days' ? '7d' : '30d'
+  const { data: overview, isLoading: isAnalyticsLoading } =
+    useAnalyticsOverviewQuery({
+      exam: exam === 'ALL' ? undefined : exam,
+      range: rangeParam,
+    })
   const last30Days = useMemo(() => {
     const today = new Date()
     return Array.from({ length: 30 }, (_, index) => subDays(today, 29 - index))
@@ -333,13 +309,64 @@ export function Dashboard() {
       <Main>
         <div className='space-y-6'>
           <div className='grid gap-4 md:grid-cols-2 lg:grid-cols-3'>
-            {kpiCards.map((stat) => (
+            {[
+              {
+                title: 'Total Users',
+                value:
+                  overview?.totalUsers != null
+                    ? overview.totalUsers.toLocaleString()
+                    : '—',
+                caption: 'All-time registrations',
+              },
+              {
+                title: `Active Users (${range})`,
+                value:
+                  overview?.activeUsers != null
+                    ? overview.activeUsers.toLocaleString()
+                    : '—',
+                caption: 'Logged activity in selected range',
+              },
+              {
+                title: 'Questions Answered',
+                value:
+                  overview?.questionsAnswered != null
+                    ? overview.questionsAnswered.toLocaleString()
+                    : '—',
+                caption: `${range} attempts`,
+              },
+              {
+                title: 'Average Accuracy',
+                value:
+                  overview?.averageAccuracy != null
+                    ? `${overview.averageAccuracy.toFixed(1)}%`
+                    : '—',
+                caption: `${range} average`,
+              },
+              {
+                title: 'Avg Study Minutes',
+                value:
+                  overview?.averageStudyMinutes != null
+                    ? overview.averageStudyMinutes.toFixed(1)
+                    : '—',
+                caption: 'Per active learner',
+              },
+              {
+                title: 'Total Rewards',
+                value:
+                  overview?.totalRewards != null
+                    ? overview.totalRewards.toLocaleString()
+                    : '—',
+                caption: 'Lifetime tokens/coins',
+              },
+            ].map((stat) => (
               <Card key={stat.title}>
                 <CardHeader>
                   <CardTitle className='text-sm font-semibold'>{stat.title}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className='text-2xl font-bold'>{stat.value}</p>
+                  <p className='text-2xl font-bold'>
+                    {isAnalyticsLoading ? '...' : stat.value}
+                  </p>
                   <p className='text-xs text-muted-foreground'>{stat.caption}</p>
                 </CardContent>
               </Card>
@@ -441,7 +468,7 @@ export function Dashboard() {
                     <TableRow key={event.id}>
                       <TableCell>
                         <Link
-                          to={`/exams/${event.id}`}
+                          to='/exams'
                           className='text-sm font-medium text-primary underline-offset-4 hover:underline'
                         >
                           {event.name}

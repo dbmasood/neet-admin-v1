@@ -1,32 +1,22 @@
 import {
+  AudioWaveform,
   BarChart,
   BookOpen,
   CalendarDays,
   CheckCircle2,
   Clock9,
   Command,
-  Construction,
   Cpu,
-  DocumentSearch,
+  FileSearch,
   FileText,
   Gift,
+  GalleryVerticalEnd,
   LayoutDashboard,
   ListChecks,
   Mic2,
-  Monitor,
-  Palette,
-  Package,
-  ServerOff,
-  Settings,
-  ShieldCheck,
   Trophy,
   Users,
-  Wrench,
-  UserCog,
-  GalleryVerticalEnd,
-  AudioWaveform,
 } from 'lucide-react'
-import { ClerkLogo } from '@/assets/clerk-logo'
 import { type SidebarData } from '../types'
 
 export const sidebarData: SidebarData = {
@@ -123,7 +113,7 @@ export const sidebarData: SidebarData = {
             {
               title: 'Learning',
               url: '/analytics/learning',
-              icon: DocumentSearch,
+              icon: FileSearch,
             },
             {
               title: 'Exams',
