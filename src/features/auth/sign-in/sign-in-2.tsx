@@ -18,8 +18,8 @@ export function SignIn2() {
           <div className='flex flex-col space-y-2 text-start'>
             <h2 className='text-lg font-semibold tracking-tight'>Sign in</h2>
             <p className='text-muted-foreground text-sm'>
-              Enter your email and password below <br />
-              to log into your account
+              Enter your username and password below <br />
+              to access your admin account
             </p>
           </div>
           <UserAuthForm />

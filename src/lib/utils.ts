@@ -9,6 +9,87 @@ export function sleep(ms: number = 1000) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
+export function safeRedirectPath(
+  value?: string | null,
+  fallback: string = '/_authenticated/'
+) {
+  if (!value) return fallback
+
+  try {
+    const url = new URL(value, 'http://localhost')
+    const path = `${url.pathname}${url.search}${url.hash}`
+    if (path.startsWith('/')) {
+      return path
+    }
+  } catch (_error) {
+    if (value.startsWith('/')) {
+      return value
+    }
+  }
+
+  return fallback
+}
+
+type LocationLike = {
+  href?: string
+  pathname?: string
+  search?: string | Record<string, unknown>
+  hash?: string
+}
+
+function stringifySearch(
+  search?: string | Record<string, unknown>
+): string {
+  if (!search) return ''
+  if (typeof search === 'string') {
+    return search.startsWith('?') ? search : `?${search.replace(/^\?/, '')}`
+  }
+
+  const params = new URLSearchParams()
+  Object.entries(search).forEach(([key, value]) => {
+    if (value == null) return
+    if (Array.isArray(value)) {
+      value.forEach((item) => {
+        if (item != null) params.append(key, String(item))
+      })
+    } else {
+      params.append(key, String(value))
+    }
+  })
+  const queryString = params.toString()
+  return queryString ? `?${queryString}` : ''
+}
+
+export function buildPathFromLocation(location?: LocationLike) {
+  if (!location) return '/_authenticated/'
+  if (location.href) {
+    try {
+      const url = new URL(location.href)
+      return `${url.pathname}${url.search}${url.hash}`
+    } catch {
+      // ignore and continue building manually
+    }
+  }
+  const pathname = location.pathname ?? '/'
+  const search = stringifySearch(location.search)
+  const hash = location.hash ?? ''
+  return `${pathname}${search}${hash}`
+}
+
+export function getInitials(value?: string | null, fallback = 'NA') {
+  if (!value) return fallback
+  const parts = value
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+  if (parts.length === 0) return fallback
+  const initials = parts
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('')
+  return initials || fallback
+}
+
 /**
  * Generates page numbers for pagination with ellipsis
  * @param currentPage - Current page number (1-based)

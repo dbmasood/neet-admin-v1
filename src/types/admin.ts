@@ -204,3 +204,25 @@ export interface AdminTopicCreateRequest {
   subjectId: string
   name: string
 }
+
+export type UserRole = 'USER' | 'ADMIN' | 'SUPER_ADMIN'
+
+export interface User {
+  id: string
+  email?: string
+  displayName?: string
+  telegramId?: string
+  createdAt?: string
+  primaryExam?: ExamCategory
+  role?: UserRole
+}
+
+export interface AuthResponse {
+  accessToken: string
+  user: User
+}
+
+export interface AdminLoginRequest {
+  username: string
+  password: string
+}
