@@ -1,13 +1,13 @@
 import { create } from 'zustand'
 import { getCookie, setCookie, removeCookie } from '@/lib/cookies'
-import { type User } from '@/types/admin'
+import { type AdminProfile } from '@/types/admin'
 
 const ACCESS_TOKEN = 'thisisjustarandomstring'
 
 interface AuthState {
   auth: {
-    user: User | null
-    setUser: (user: User | null) => void
+    user: AdminProfile | null
+    setUser: (user: AdminProfile | null) => void
     accessToken: string
     setAccessToken: (accessToken: string) => void
     resetAccessToken: () => void

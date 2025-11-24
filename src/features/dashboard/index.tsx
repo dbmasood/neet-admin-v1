@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from '@tanstack/react-router'
-import { format, subDays } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 import {
   Bar,
   BarChart,
@@ -30,7 +30,20 @@ import { ConfigDrawer } from '@/components/config-drawer'
 import { ProfileDropdown } from '@/components/profile-dropdown'
 import { ExamSelector } from '@/components/exam-selector'
 import { examLabelMap, type ExamSelection, useCurrentExam } from '@/stores/exam-store'
-import { useAnalyticsOverviewQuery } from './api'
+import {
+  useAnalyticsOverviewQuery,
+  useAnalyticsTimeSeriesQuery,
+  useReferralSummaryQuery,
+  useSubjectAccuracyQuery,
+  useUpcomingEventsQuery,
+  useWeakTopicsQuery,
+} from './api'
+import {
+  examConfigTypeLabels,
+  examStatusLabels,
+  type AdminReferralSummary,
+  type AnalyticsTimeSeries,
+} from '@/types/admin'
 
 type ActivityPoint = {
   date: string
@@ -42,17 +55,6 @@ type WeakTopicRow = {
   topic: string
   accuracy: number
   attempts: number
-  exam: ExamSelection
-}
-
-type EventRow = {
-  id: string
-  name: string
-  exam: ExamSelection
-  type: string
-  startDate: string
-  registered: string
-  status: 'Scheduled' | 'Ongoing' | 'Completed'
 }
 
 const dateRangeOptions = ['Today', 'Last 7 days', 'Last 30 days'] as const
@@ -60,146 +62,26 @@ const dateRangeOptions = ['Today', 'Last 7 days', 'Last 30 days'] as const
 type DateRange = (typeof dateRangeOptions)[number]
 
 
-const subjectAccuracyMap: Record<ExamSelection, { subject: string; accuracy: number }[]> = {
-  NEET_PG: [
-    { subject: 'Anatomy', accuracy: 72 },
-    { subject: 'Physiology', accuracy: 65 },
-    { subject: 'Biochemistry', accuracy: 58 },
-    { subject: 'Pathology', accuracy: 62 },
-    { subject: 'Pharmacology', accuracy: 55 },
-    { subject: 'Microbiology', accuracy: 60 },
-  ],
-  NEET_UG: [
-    { subject: 'Physics', accuracy: 68 },
-    { subject: 'Chemistry', accuracy: 70 },
-    { subject: 'Biology', accuracy: 63 },
-    { subject: 'Mathematics', accuracy: 61 },
-    { subject: 'Botany', accuracy: 66 },
-    { subject: 'Zoology', accuracy: 64 },
-  ],
-  JEE: [
-    { subject: 'Mechanics', accuracy: 71 },
-    { subject: 'Electrostatics', accuracy: 64 },
-    { subject: 'Organic Chemistry', accuracy: 59 },
-    { subject: 'Inorganic Chemistry', accuracy: 62 },
-    { subject: 'Thermodynamics', accuracy: 55 },
-    { subject: 'Coordination Chemistry', accuracy: 58 },
-  ],
-  UPSC: [
-    { subject: 'Polity', accuracy: 74 },
-    { subject: 'History', accuracy: 61 },
-    { subject: 'Geography', accuracy: 66 },
-    { subject: 'Economy', accuracy: 59 },
-    { subject: 'Environment', accuracy: 68 },
-    { subject: 'Current Affairs', accuracy: 63 },
-  ],
-  ALL: [
-    { subject: 'Anatomy', accuracy: 70 },
-    { subject: 'Physics', accuracy: 66 },
-    { subject: 'Polity', accuracy: 68 },
-    { subject: 'Chemistry', accuracy: 64 },
-    { subject: 'History', accuracy: 62 },
-    { subject: 'Biochemistry', accuracy: 60 },
-  ],
-}
 
-const weakestTopicsData: WeakTopicRow[] = [
-  { subject: 'Pharmacology', topic: 'Autonomic Drugs', accuracy: 42, attempts: 1240, exam: 'NEET_PG' },
-  { subject: 'Anatomy', topic: 'Neuroanatomy', accuracy: 45, attempts: 1120, exam: 'NEET_PG' },
-  { subject: 'Physics', topic: 'Electrostatics', accuracy: 48, attempts: 980, exam: 'JEE' },
-  { subject: 'Chemistry', topic: 'Coordination Chemistry', accuracy: 49, attempts: 1050, exam: 'JEE' },
-  { subject: 'Polity', topic: 'Constitution', accuracy: 51, attempts: 980, exam: 'UPSC' },
-  { subject: 'History', topic: 'Medieval India', accuracy: 54, attempts: 910, exam: 'UPSC' },
-  { subject: 'Physics', topic: 'Modern Physics', accuracy: 53, attempts: 870, exam: 'JEE' },
-  { subject: 'Biology', topic: 'Genetics', accuracy: 47, attempts: 930, exam: 'NEET_UG' },
-  { subject: 'Chemistry', topic: 'Organic Mechanisms', accuracy: 50, attempts: 890, exam: 'NEET_UG' },
-  { subject: 'Geography', topic: 'Map Reading', accuracy: 55, attempts: 840, exam: 'UPSC' },
-]
-
-const eventData: EventRow[] = [
-  {
-    id: 'mock-bio-1',
-    name: 'NEET PG - High Yield Bio Mock',
-    exam: 'NEET_PG',
-    type: 'Mock',
-    startDate: '12 Nov 2024 · 10:00 IST',
-    registered: '2,420',
-    status: 'Scheduled',
-  },
-  {
-    id: 'subject-test-1',
-    name: 'NEET UG · Anatomy Sprint',
-    exam: 'NEET_UG',
-    type: 'Subject Test',
-    startDate: '14 Nov 2024 · 18:30 IST',
-    registered: '1,180',
-    status: 'Scheduled',
-  },
-  {
-    id: 'reward-event-1',
-    name: 'JEE · Daily Accuracy Push',
-    exam: 'JEE',
-    type: 'Reward Event',
-    startDate: 'Daily · 08:00 IST',
-    registered: '3,900',
-    status: 'Ongoing',
-  },
-  {
-    id: 'upsc-daily-1',
-    name: 'UPSC · GS Current Affairs',
-    exam: 'UPSC',
-    type: 'Subject Test',
-    startDate: '15 Nov 2024 · 07:00 IST',
-    registered: '870',
-    status: 'Scheduled',
-  },
-]
-
-const referralSnapshot = [
-  {
-    title: 'Total Referrals',
-    value: '980',
-    caption: 'New users acquired through referrals this month',
-  },
-  {
-    title: 'Referral Rewards Paid (₹)',
-    value: '₹18,200',
-    caption: 'Cash + token payouts',
-  },
-]
-
-const examSeedOffset: Record<ExamSelection, number> = {
-  NEET_PG: 10,
-  NEET_UG: 8,
-  JEE: 12,
-  UPSC: 6,
-  ALL: 5,
-}
-
-const formatDay = (date: Date) => format(date, 'dd MMM')
-
-function buildDailySeries(
-  exam: ExamSelection,
-  base: number,
-  variance: number,
-  slope: number,
-  dates: Date[]
-): ActivityPoint[] {
-  const seed = examSeedOffset[exam] ?? 6
-  return dates.map((date, index) => {
-    const noise = Math.sin((index + seed) / 3)
-    const value = Math.max(
-      0,
-      Math.round(base + seed * 4 + noise * variance + index * slope)
+function ActivityChart({
+  data,
+  color,
+  isLoading,
+}: {
+  data: ActivityPoint[]
+  color?: string
+  isLoading?: boolean
+}) {
+  if (isLoading) {
+    return <p className='text-sm text-muted-foreground'>Loading chart...</p>
+  }
+  if (!data.length) {
+    return (
+      <p className='text-sm text-muted-foreground'>
+        No data available for the selected range.
+      </p>
     )
-    return {
-      date: formatDay(date),
-      value,
-    }
-  })
-}
-
-function ActivityChart({ data, color }: { data: ActivityPoint[]; color?: string }) {
+  }
   return (
     <ResponsiveContainer width='100%' height={280}>
       <LineChart data={data}>
@@ -219,7 +101,23 @@ function ActivityChart({ data, color }: { data: ActivityPoint[]; color?: string 
   )
 }
 
-function AccuracyChart({ data }: { data: { subject: string; accuracy: number }[] }) {
+function AccuracyChart({
+  data,
+  isLoading,
+}: {
+  data: { subject: string; accuracy: number }[]
+  isLoading?: boolean
+}) {
+  if (isLoading) {
+    return <p className='text-sm text-muted-foreground'>Loading chart...</p>
+  }
+  if (!data.length) {
+    return (
+      <p className='text-sm text-muted-foreground'>
+        No subject accuracy data available.
+      </p>
+    )
+  }
   return (
     <ResponsiveContainer width='100%' height={260}>
       <BarChart data={data}>
@@ -233,44 +131,165 @@ function AccuracyChart({ data }: { data: { subject: string; accuracy: number }[]
   )
 }
 
+function formatTimeSeries(series?: AnalyticsTimeSeries): ActivityPoint[] {
+  if (!series?.points?.length) return []
+  return series.points.map((point) => ({
+    date: formatDateLabel(point.date),
+    value: point.value ?? 0,
+  }))
+}
+
+function formatDateLabel(value?: string) {
+  if (!value) return ''
+  try {
+    return format(parseISO(value), 'dd MMM')
+  } catch {
+    return value
+  }
+}
+
+function toPercent(value?: number) {
+  if (value == null) return 0
+  const normalized = value <= 1 ? value * 100 : value
+  return Math.round(normalized)
+}
+
+function buildReferralSnapshot(
+  summary: AdminReferralSummary | undefined,
+  fallbackRange: string
+) {
+  return [
+    {
+      title: 'Total Referrals',
+      value:
+        summary?.totalReferrals != null
+          ? summary.totalReferrals.toLocaleString()
+          : '—',
+      caption: summary?.range
+        ? `Range: ${summary.range}`
+        : `Range: ${fallbackRange}`,
+    },
+    {
+      title: 'Referral Rewards Paid (₹)',
+      value:
+        summary?.rewardsPaid != null
+          ? `₹${summary.rewardsPaid.toLocaleString()}`
+          : '—',
+      caption:
+        summary?.newUsers != null
+          ? `${summary.newUsers.toLocaleString()} new users`
+          : 'Cash + token payouts',
+    },
+  ]
+}
+
+function formatEventDate(value: string) {
+  if (!value) return '—'
+  try {
+    return format(parseISO(value), 'dd MMM yyyy · HH:mm')
+  } catch {
+    return value
+  }
+}
+
 export function Dashboard() {
   const { exam } = useCurrentExam()
   const [range, setRange] = useState<DateRange>('Last 7 days')
   const examLabel = examLabelMap[exam]
   const rangeParam =
     range === 'Today' ? 'today' : range === 'Last 7 days' ? '7d' : '30d'
+  const filteredExam = exam === 'ALL' ? undefined : exam
+
   const { data: overview, isLoading: isAnalyticsLoading } =
     useAnalyticsOverviewQuery({
-      exam: exam === 'ALL' ? undefined : exam,
+      exam: filteredExam,
       range: rangeParam,
     })
-  const last30Days = useMemo(() => {
-    const today = new Date()
-    return Array.from({ length: 30 }, (_, index) => subDays(today, 29 - index))
-  }, [])
+
+  const {
+    data: activeSeries,
+    isLoading: isActiveSeriesLoading,
+  } = useAnalyticsTimeSeriesQuery({
+    exam: filteredExam,
+    range: rangeParam,
+    metric: 'active_users',
+  })
+
+  const {
+    data: questionsSeries,
+    isLoading: isQuestionsSeriesLoading,
+  } = useAnalyticsTimeSeriesQuery({
+    exam: filteredExam,
+    range: rangeParam,
+    metric: 'questions_answered',
+  })
+
+  const {
+    data: accuracyResponse,
+    isLoading: isAccuracyLoading,
+  } = useSubjectAccuracyQuery({
+    exam: filteredExam,
+  })
+
+  const {
+    data: weakTopicsResponse,
+    isLoading: isWeakTopicsLoading,
+  } = useWeakTopicsQuery({
+    exam: filteredExam,
+    limit: 10,
+  })
+
+  const {
+    data: eventsResponse,
+    isLoading: isEventsLoading,
+  } = useUpcomingEventsQuery({
+    exam: filteredExam,
+  })
+
+  const {
+    data: referralSummary,
+    isLoading: isReferralLoading,
+  } = useReferralSummaryQuery({
+    range: rangeParam,
+  })
 
   const dailyActive = useMemo(
-    () => buildDailySeries(exam, 900, 140, 4, last30Days),
-    [exam, last30Days]
+    () => formatTimeSeries(activeSeries),
+    [activeSeries]
   )
 
   const dailyQuestions = useMemo(
-    () => buildDailySeries(exam, 15500, 220, 12, last30Days),
-    [exam, last30Days]
+    () => formatTimeSeries(questionsSeries),
+    [questionsSeries]
   )
 
-  const accuracyData = subjectAccuracyMap[exam] ?? subjectAccuracyMap.ALL
+  const accuracyData = useMemo(
+    () =>
+      (accuracyResponse?.subjects ?? []).map((subject) => ({
+        subject: subject.subjectName,
+        accuracy: toPercent(subject.accuracy),
+      })),
+    [accuracyResponse]
+  )
 
-  const weakestTopics = useMemo(() => {
-    return weakestTopicsData
-      .filter((topic) => exam === 'ALL' || topic.exam === exam)
-      .sort((a, b) => a.accuracy - b.accuracy)
-      .slice(0, 10)
-  }, [exam])
+  const weakestTopics = useMemo<WeakTopicRow[]>(() => {
+    return (weakTopicsResponse?.items ?? []).map((topic) => ({
+      subject: topic.subjectName,
+      topic: topic.topicName,
+      accuracy: toPercent(topic.accuracy),
+      attempts: topic.attempts ?? 0,
+    }))
+  }, [weakTopicsResponse])
 
-  const upcomingEvents = useMemo(() => {
-    return eventData.filter((event) => exam === 'ALL' || event.exam === exam)
-  }, [exam])
+  const upcomingEvents = useMemo(
+    () => eventsResponse?.items ?? [],
+    [eventsResponse]
+  )
+
+  const referralSnapshot = useMemo(
+    () => buildReferralSnapshot(referralSummary, range),
+    [referralSummary, range]
+  )
 
   return (
     <>
@@ -380,7 +399,10 @@ export function Dashboard() {
                 <CardDescription>Past 30 days trend</CardDescription>
               </CardHeader>
               <CardContent>
-                <ActivityChart data={dailyActive} />
+                <ActivityChart
+                  data={dailyActive}
+                  isLoading={isActiveSeriesLoading}
+                />
               </CardContent>
             </Card>
             <Card>
@@ -389,7 +411,11 @@ export function Dashboard() {
                 <CardDescription>Across {examLabel}</CardDescription>
               </CardHeader>
               <CardContent>
-                <ActivityChart data={dailyQuestions} color='#f97316' />
+                <ActivityChart
+                  data={dailyQuestions}
+                  color='#f97316'
+                  isLoading={isQuestionsSeriesLoading}
+                />
               </CardContent>
             </Card>
           </div>
@@ -401,7 +427,10 @@ export function Dashboard() {
                 <CardDescription>Average accuracy for {examLabel}</CardDescription>
               </CardHeader>
               <CardContent className='pb-2'>
-                <AccuracyChart data={accuracyData} />
+                <AccuracyChart
+                  data={accuracyData}
+                  isLoading={isAccuracyLoading}
+                />
               </CardContent>
             </Card>
             <Card>
@@ -421,14 +450,29 @@ export function Dashboard() {
                       <TableCell className='font-semibold'>Attempts</TableCell>
                     </TableRow>
                   </TableHead>
-                  <TableBody>
-                    {weakestTopics.map((topic) => (
+                <TableBody>
+                  {isWeakTopicsLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className='text-center'>
+                        Loading weak topics...
+                      </TableCell>
+                    </TableRow>
+                  ) : !weakestTopics.length ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className='text-center'>
+                        No weak topics available for this exam.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    weakestTopics.map((topic) => (
                       <TableRow key={`${topic.subject}-${topic.topic}`}>
                         <TableCell>
                           <span className='text-sm font-medium'>{topic.subject}</span>
                         </TableCell>
                         <TableCell>
-                          <span className='text-sm text-muted-foreground'>{topic.topic}</span>
+                          <span className='text-sm text-muted-foreground'>
+                            {topic.topic}
+                          </span>
                         </TableCell>
                         <TableCell>
                           <Badge variant='secondary'>{topic.accuracy}%</Badge>
@@ -439,9 +483,10 @@ export function Dashboard() {
                           </span>
                         </TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
               </CardContent>
             </Card>
           </div>
@@ -464,49 +509,66 @@ export function Dashboard() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {upcomingEvents.map((event) => (
-                    <TableRow key={event.id}>
-                      <TableCell>
-                        <Link
-                          to='/exams'
-                          className='text-sm font-medium text-primary underline-offset-4 hover:underline'
-                        >
-                          {event.name}
-                        </Link>
-                      </TableCell>
-                      <TableCell>
-                        <span className='text-sm text-muted-foreground'>
-                          {examLabelMap[event.exam]}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className='text-sm'>{event.type}</span>
-                      </TableCell>
-                      <TableCell>
-                        <span className='text-sm text-muted-foreground'>
-                          {event.startDate}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <span className='text-sm text-muted-foreground'>
-                          {event.registered}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            event.status === 'Ongoing'
-                              ? 'default'
-                              : event.status === 'Scheduled'
-                              ? 'outline'
-                              : 'secondary'
-                          }
-                        >
-                          {event.status}
-                        </Badge>
+                  {isEventsLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className='text-center'>
+                        Loading events...
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : !upcomingEvents.length ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className='text-center'>
+                        No upcoming events.
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    upcomingEvents.map((event) => {
+                      const eventType =
+                        examConfigTypeLabels[event.type] ?? event.type
+                      const statusLabel =
+                        examStatusLabels[event.status] ?? event.status
+                      const statusVariant =
+                        event.status === 'ONGOING'
+                          ? 'default'
+                          : event.status === 'SCHEDULED'
+                          ? 'outline'
+                          : 'secondary'
+
+                      return (
+                        <TableRow key={event.id}>
+                          <TableCell>
+                            <Link
+                              to='/exams'
+                              className='text-sm font-medium text-primary underline-offset-4 hover:underline'
+                            >
+                              {event.name}
+                            </Link>
+                          </TableCell>
+                          <TableCell>
+                            <span className='text-sm text-muted-foreground'>
+                              {examLabelMap[event.exam as ExamSelection]}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span className='text-sm'>{eventType}</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className='text-sm text-muted-foreground'>
+                              {formatEventDate(event.startAt)}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span className='text-sm text-muted-foreground'>
+                              {event.registeredCount.toLocaleString()}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={statusVariant}>{statusLabel}</Badge>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })
+                  )}
                 </TableBody>
               </Table>
             </CardContent>
@@ -519,7 +581,9 @@ export function Dashboard() {
                   <CardTitle className='text-sm font-semibold'>{stat.title}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className='text-2xl font-bold'>{stat.value}</p>
+                  <p className='text-2xl font-bold'>
+                    {isReferralLoading ? '...' : stat.value}
+                  </p>
                   <p className='text-xs text-muted-foreground'>{stat.caption}</p>
                 </CardContent>
               </Card>

@@ -24,6 +24,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { SelectDropdown } from '@/components/select-dropdown'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -176,7 +177,7 @@ export function QuestionsPage() {
           </CardHeader>
           <CardContent className='flex flex-wrap gap-3'>
             <div className='w-full max-w-xs'>
-              <FormLabel>Subject</FormLabel>
+              <Label>Subject</Label>
               <SelectDropdown
                 isPending={isLoadingSubjects}
                 items={[
@@ -196,7 +197,7 @@ export function QuestionsPage() {
               />
             </div>
             <div className='w-full max-w-xs'>
-              <FormLabel>Topic</FormLabel>
+              <Label>Topic</Label>
               <SelectDropdown
                 isPending={isLoadingTopics}
                 items={[
@@ -213,9 +214,9 @@ export function QuestionsPage() {
                 disabled={!subjectFilter}
               />
               {!subjectFilter && (
-                <FormDescription>
+                <p className='text-muted-foreground text-sm'>
                   Select a subject first to filter by topic.
-                </FormDescription>
+                </p>
               )}
             </div>
           </CardContent>

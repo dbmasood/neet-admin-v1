@@ -18,7 +18,10 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { PasswordInput } from '@/components/password-input'
-import { useAdminLoginMutation } from '@/features/auth/api'
+import {
+  fetchAdminProfile,
+  useAdminLoginMutation,
+} from '@/features/auth/api'
 
 const formSchema = z.object({
   username: z
@@ -56,11 +59,29 @@ export function UserAuthForm({
     try {
       const response = await mutateAsync(values)
 
-      auth.setUser(response.user)
       auth.setAccessToken(response.accessToken)
 
-      const friendlyName =
+      let friendlyName =
         response.user.displayName || response.user.email || response.user.id
+
+      try {
+        const profile = await fetchAdminProfile()
+        auth.setUser(profile)
+        friendlyName =
+          profile.displayName || profile.email || profile.id || friendlyName
+      } catch (profileError) {
+        // Fallback to basic user info until profile loads elsewhere
+        auth.setUser({
+          id: response.user.id,
+          displayName: response.user.displayName ?? response.user.email,
+          email: response.user.email,
+        })
+
+        if (import.meta.env.DEV) {
+          // eslint-disable-next-line no-console
+          console.error('Failed to fetch admin profile', profileError)
+        }
+      }
 
       toast.success(
         friendlyName ? `Welcome back, ${friendlyName}!` : 'Signed in successfully'

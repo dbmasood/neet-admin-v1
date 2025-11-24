@@ -1,6 +1,5 @@
 import { Loader } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { FormControl } from '@/components/ui/form'
 import {
   Select,
   SelectContent,
@@ -30,16 +29,35 @@ export function SelectDropdown({
   className = '',
   isControlled = false,
 }: SelectDropdownProps) {
-  const defaultState = isControlled
-    ? { value: defaultValue, onValueChange }
-    : { defaultValue, onValueChange }
+  const EMPTY_VALUE = '__select-empty-value__'
+  const hasEmptyItem = Boolean(items?.some((item) => item.value === ''))
+
+  const mapItemValue = (value: string) =>
+    value === '' ? EMPTY_VALUE : value
+
+  const mapSelectedValue = (value?: string) => {
+    if (value === undefined) return undefined
+    if (value === '' && hasEmptyItem) return EMPTY_VALUE
+    return value
+  }
+
+  const handleChange = (value: string) => {
+    if (!onValueChange) return
+    onValueChange(value === EMPTY_VALUE ? '' : value)
+  }
+
+  const selectProps = isControlled
+    ? { value: mapSelectedValue(defaultValue), onValueChange: handleChange }
+    : {
+        defaultValue: mapSelectedValue(defaultValue),
+        onValueChange: handleChange,
+      }
+
   return (
-    <Select {...defaultState}>
-      <FormControl>
-        <SelectTrigger disabled={disabled} className={cn(className)}>
-          <SelectValue placeholder={placeholder ?? 'Select'} />
-        </SelectTrigger>
-      </FormControl>
+    <Select {...selectProps}>
+      <SelectTrigger disabled={disabled} className={cn(className)}>
+        <SelectValue placeholder={placeholder ?? 'Select'} />
+      </SelectTrigger>
       <SelectContent>
         {isPending ? (
           <SelectItem disabled value='loading' className='h-14'>
@@ -51,7 +69,10 @@ export function SelectDropdown({
           </SelectItem>
         ) : (
           items?.map(({ label, value }) => (
-            <SelectItem key={value} value={value}>
+            <SelectItem
+              key={value || `empty-${label}`}
+              value={mapItemValue(value)}
+            >
               {label}
             </SelectItem>
           ))

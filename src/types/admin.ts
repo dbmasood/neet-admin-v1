@@ -226,3 +226,145 @@ export interface AdminLoginRequest {
   username: string
   password: string
 }
+
+export interface AdminProfile {
+  id: string
+  displayName?: string
+  email?: string
+  role?: string
+  primaryExam?: ExamCategory
+  permissions?: string[]
+  createdAt?: string
+}
+
+export interface AnalyticsPoint {
+  date: string
+  value: number
+}
+
+export interface AnalyticsTimeSeries {
+  exam?: ExamCategory
+  metric: string
+  range?: string
+  points: AnalyticsPoint[]
+}
+
+export interface SubjectAccuracyItem {
+  subjectId: string
+  subjectName: string
+  accuracy: number
+}
+
+export interface SubjectAccuracyResponse {
+  exam?: ExamCategory
+  subjects: SubjectAccuracyItem[]
+}
+
+export interface WeakTopicItem {
+  subjectId: string
+  subjectName: string
+  topicId: string
+  topicName: string
+  accuracy: number
+  attempts: number
+}
+
+export interface WeakTopicsResponse {
+  items: WeakTopicItem[]
+}
+
+export interface AdminEventSummary {
+  id: string
+  name: string
+  exam: ExamCategory
+  type: ExamConfigType
+  startAt: string
+  registeredCount: number
+  status: ExamStatus
+}
+
+export interface AdminEventsResponse {
+  items: AdminEventSummary[]
+}
+
+export interface AdminReferralSummary {
+  totalReferrals?: number
+  rewardsPaid?: number
+  newUsers?: number
+  range?: string
+}
+
+export type AdminUserRole = 'superadmin' | 'admin' | 'manager' | 'cashier'
+
+export type AdminUserStatus =
+  | 'active'
+  | 'inactive'
+  | 'invited'
+  | 'suspended'
+
+export interface AdminUser {
+  id: string
+  firstName: string
+  lastName: string
+  username: string
+  email: string
+  phoneNumber: string
+  role: AdminUserRole
+  status: AdminUserStatus
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface AdminUsersMeta {
+  page: number
+  pageSize: number
+  total: number
+}
+
+export interface AdminUserList {
+  items: AdminUser[]
+  meta: AdminUsersMeta
+}
+
+export interface AdminUserCreateRequest {
+  firstName: string
+  lastName: string
+  username: string
+  email: string
+  phoneNumber: string
+  role: AdminUserRole
+  status: AdminUserStatus
+  password: string
+}
+
+export type AdminUserUpdateRequest = Partial<
+  Omit<AdminUserCreateRequest, 'password'> & { password?: string }
+>
+
+export interface AdminInviteRequest {
+  email: string
+  role: AdminUserRole
+  message?: string
+}
+
+export interface AdminInviteResponse {
+  invited: boolean
+  expiresAt?: string
+}
+
+export interface AdminBulkStatusRequest {
+  userIds: string[]
+  status: AdminUserStatus
+}
+
+export interface AdminBulkStatusResponse {
+  updated: number
+}
+
+export interface AdminBulkDeleteRequest {
+  userIds: string[]
+}
+
+export interface AdminBulkDeleteResponse {
+  deleted: number
+}

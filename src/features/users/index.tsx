@@ -9,13 +9,25 @@ import { UsersDialogs } from './components/users-dialogs'
 import { UsersPrimaryButtons } from './components/users-primary-buttons'
 import { UsersProvider } from './components/users-provider'
 import { UsersTable } from './components/users-table'
-import { users } from './data/users'
+import { useAdminUsersQuery } from './api'
 
 const route = getRouteApi('/_authenticated/users/')
 
 export function Users() {
   const search = route.useSearch()
   const navigate = route.useNavigate()
+  const statusFilter = Array.isArray(search.status) ? search.status : []
+  const roleFilter = Array.isArray(search.role) ? search.role : []
+
+  const { data, isFetching } = useAdminUsersQuery({
+    page: search.page,
+    pageSize: search.pageSize,
+    status: statusFilter,
+    role: roleFilter,
+    username: search.username,
+  })
+
+  const users = data?.items ?? []
 
   return (
     <UsersProvider>
@@ -38,7 +50,13 @@ export function Users() {
           </div>
           <UsersPrimaryButtons />
         </div>
-        <UsersTable data={users} search={search} navigate={navigate} />
+        <UsersTable
+          data={users}
+          meta={data?.meta}
+          isLoading={isFetching}
+          search={search}
+          navigate={navigate}
+        />
       </Main>
 
       <UsersDialogs />
